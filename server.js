@@ -13,6 +13,8 @@ var ObjectID = mongodb.ObjectID;
 var db;
 var uri = "mongodb://wangmo:mlab77@ds155028.mlab.com:55028/heroku_d4fr10z1";
 var HERO_COLLECTION = "heroes";
+var FAVORITE_COLLECTION = "Likes";
+var COMMENT_COLLECTION = "Comments";
 
 app.use(morgan('dev'));                                         // log every request to the console
 app.use(bodyParser.urlencoded({'extended':'true'}));            // parse application/x-www-form-urlencoded
@@ -62,7 +64,9 @@ var Hero = mongoose.model('Hero', {
     power: String,
     relation: String,
     gender:String,
-    posted: Date
+    imgUrl: String,
+    posted: Date,
+    dataUrl: Binary Data
 });
 
  var filterObj = {} ; 
@@ -93,7 +97,7 @@ function filterData(filterReq){
         filterObj.faith = { "$regex": filter.faith, "$options": "i" } ;
       }
       if(filter.nationality){
-        filterObj.nationality =  filter.nationality;
+        filterObj.nationality = { $in: filter.power}; //filter.nationality;
       }
     }
      // return filterObj;
@@ -127,6 +131,22 @@ function getHeroes(res){
   });
 
 }
+
+
+//to return the fav count for the hero
+function getFavCount(res){
+
+ db.collection(HERO_COLLECTION).find(filterObj)
+ .sort({'posted' : -1}).skip(skipNo).limit(pageSize)
+ .toArray(function(err, docs) {
+    if (err) {
+      handleError(res, err.message, "Failed to get favorite counts.");
+    } else {
+      res.status(200).json(docs);
+    }
+  });
+}
+
 function saveHero(req,res){
   // db.collection("heroes").create({
   //           heroName : req.body.heroName,
@@ -165,6 +185,19 @@ function saveHero(req,res){
         getHeroes(res);
     }
   });
+}
+
+//save favorite
+function saveFavorite(req,res){
+  var fav = req.body;
+  fav.posted = new Date();
+  db.collection(FAVORITE_COLLECTION).insertOne(fav, function(err, doc) {
+    if (err) {
+      handleError(res, err.message, "Failed to add to favorite");
+    } else {
+     getFavCount(res);
+    }
+  });
 
 }
 
@@ -189,6 +222,8 @@ function saveHero(req,res){
         }
         if(req.query.filter){
             filterData(req.query.filter);
+        }else{
+          filterObj={};
         }
         delete filterObj._id; //remove the filter for id
         getHeroes(res); //get the heroes data from hero db
@@ -198,11 +233,21 @@ function saveHero(req,res){
     app.post('/api/heroes', function(req, res) {
         if(req.body.filter){
            filterData(req.body.filter);
+        }else{
+          filterObj={};
         }
         // create a hero, information comes from request from Ionic
         saveHero(req,res);
     });
  
+     // create new hero and send back all heroess after creation
+    app.post('/api/fav', function(req, res) {
+        
+        // create a hero, information comes from request from Ionic
+        saveFavorite(req,res);
+    });
+ 
+
     //delete a hero
     app.delete('/api/heroes/:heroId', function(req, res) {
       // console.log(req.params.heroId);
